@@ -1,9 +1,10 @@
 import PySimpleGUI as sg
-import sys
-from PIL import Image
-from utils import text_file, Pdf
+from utils import text_file, Pdf, load_word2vec, retrieve, print_output_sents
 import random
 
+
+word2vec = load_word2vec()
+print(word2vec.most_similar('snake', topn = 5))
 
 
 #List of all file names for display in '-FILE LIST-'
@@ -23,11 +24,10 @@ cprint = sg.cprint
 #List of possible background colors for cprint to use
 background_colors = ['yellow', 'orange']
 
-
-
 def make_win1():
     file_list_column = [
         [sg.Text('Upload file'), sg.In(size=(25, 1), enable_events=True, key='-FILES-'), sg.FileBrowse()],
+        [sg.Checkbox('word2vec', key = '-WORD2VEC-')],
         [sg.Listbox(values=[], size=(40, 20), enable_events=True, select_mode='multiple', key='-FILE LIST-')]]
 
     file_text_column = [[sg.Text('Enter query: '), sg.In(size=(25, 1), enable_events=True, key='-QUERY-'),
@@ -45,7 +45,7 @@ def make_win1():
 
 def make_win2():
     layout = [[sg.Text(size=(40, 1), key='-WIN2 NUM SENTS-')],
-               [sg.Button('Shuffle', enable_events=True, key='-SHUFFLE-'), sg.Checkbox('word2vec', enable_events=True, key = '-WORD2VEC-'),
+               [sg.Button('Shuffle', enable_events=True, key='-SHUFFLE-'),
                 sg.Multiline(size = (50,1), enable_events=True, disabled=True, key = '-LEGEND-')],
                [sg.Multiline(enable_events=True, disabled=True, key='-WIN2 TEXT-', size=(150, 50))],
                [sg.Button('Exit')]]
@@ -89,15 +89,12 @@ while True:
 
 
     elif event == '-FIND-':
+
         if not window2:
             window2 = make_win2()
 
         # Tells cprint which widget element to print the colored text in
         sg.cprint_set_output_destination(window2, '-WIN2 TEXT-')
-
-        #Initialize num_sents_found and output_sents
-        num_sents_found = 0
-        output_sents=  []
 
         #Clear output box
         window2['-WIN2 TEXT-']('')
@@ -108,51 +105,49 @@ while True:
         #Get the list of pdfs/txt_files user has chosen
         files = values['-FILE LIST-']
 
-        #Initialize zipped list, which will contain all output sentences along with corresponding index telling which file they belong in
-        output_sents_zipped = []
+        output_sents_zipped, num_sents_found = retrieve(files, query, pdf_obj, txt_obj)
 
-
+        #Display the legend
         for i, file in enumerate(files):
-            if file.endswith('.pdf'):
-                pdf = pdf_obj[file]
-                output_sents = pdf.get_sents(query)
-                num_sents_found += len(output_sents)
-
-                output_sents_zipped += list(zip([i]*num_sents_found, output_sents))
-
-            elif file.endswith('.txt'):
-                txt = txt_obj[file]
-                output_sents = txt.get_sents(query)
-                num_sents_found += len(output_sents)
-
-                output_sents_zipped = list(zip([i]*num_sents_found, output_sents))
-
             # Create legend denoting which color corresponds to which document
             window2['-LEGEND-'].print(file, end='', background_color=background_colors[i])
             window2['-LEGEND-'].print('\n', end='')
 
-        for i, sent in output_sents_zipped:
-            # If user only chose one file, no need to highlight it a certain color
-            if len(files) == 1:
-                cprint(sent, end = '\n\n')
-            else:
-                #win2['-WIN2 TEXT-'].print(sent, end=  '\n\n')
-                cprint(sent, background_color=background_colors[i], end = '\n\n')
+        #Print the color-coded output sentences
+        print_output_sents(output_sents_zipped, files, background_colors, cprint)
 
+        #Print the number of sentences that were found
         window2['-WIN2 NUM SENTS-'].update(f"Found {num_sents_found} sentences containing '{query}'.")
 
+
+        #For word2vec
+        if values['-WORD2VEC-'] == True:
+
+            w2v_sents = []
+
+            # Get the 20 most similar words to the query and batch query the results against the document(s)
+            topn = word2vec.most_similar(query, topn=20)
+
+            # Loop through the word2vec results, which come in a list of tuples that each take the form: (word, similarity_score)
+            for word, _ in topn:
+                output_sents_zipped, _ = retrieve(files, word, pdf_obj, txt_obj)
+
+                w2v_sents += output_sents_zipped
+
+            # Print how many word2vec sentences it found
+            cprint(f"Found {len(w2v_sents)} potentially related sentences using word2vec.", text_color='red', end = '\n\n')
+
+            # Print w2v_sents
+            print_output_sents(w2v_sents, files, background_colors, cprint)
+
+            # for sent in w2v_sents:
+            #     cprint(sent, background_color = background_color[i])
 
     elif event == '-SHUFFLE-':
         #Clear the output box
         window2['-WIN2 TEXT-']('')
-
         random.shuffle(output_sents_zipped)
+        print_output_sents(output_sents_zipped, files, background_colors, cprint)
 
-        for i, sent in output_sents_zipped:
-            if len(files) == 1:
-                cprint(sent, end='\n\n')
-            else:
-                # win2['-WIN2 TEXT-'].print(sent, end=  '\n\n')
-                cprint(sent, background_color=background_colors[i], end='\n\n')
-
+        
 window.close()
