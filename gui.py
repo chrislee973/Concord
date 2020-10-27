@@ -4,7 +4,6 @@ import random
 
 
 word2vec = load_word2vec()
-print(word2vec.most_similar('snake', topn = 5))
 
 
 #List of all file names for display in '-FILE LIST-'
