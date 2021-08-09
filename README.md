@@ -1,2 +1,2 @@
 # Concord
-An electronic [concordance](https://en.wikipedia.org/wiki/Concordance_(publishing))
+A digital [concordance](https://en.wikipedia.org/wiki/Concordance_(publishing))
