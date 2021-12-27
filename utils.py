@@ -4,7 +4,7 @@ import pdfplumber
 import gensim.downloader as api
 
 
-class text_file:
+class TextFile:
     def __init__(self, fpath):
         with open(fpath) as f:
             text = f.read()
